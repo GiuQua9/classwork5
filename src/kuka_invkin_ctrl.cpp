@@ -284,13 +284,7 @@ void KUKA_INVKIN::ctrl_loop() {
 		_m[0][i] = _m[0][i]/6 + _p_out.p.x();
 		_m[1][i] = _m[1][i]/6 + _p_out.p.y();
 		_m[2][i] = _m[2][i]/6 + _p_out.p.z();
-	}/*
-	for ( int i = 0; i < 3; i++ )
-      for ( int j = 0; j < 4; j++ ) {
-      
-         cout << "_m[" << i << "][" << j << "]: ";
-         cout << _m[i][j]<< endl;
-      }*/
+	}
 
 	int pos = 0;
 
@@ -301,9 +295,9 @@ void KUKA_INVKIN::ctrl_loop() {
 		F_dest.p.data[0] = _m[0][pos];
 		F_dest.p.data[1] = _m[1][pos];
 		F_dest.p.data[2] = _m[2][pos];
-		cout<<"_m[0]["<<pos<<"] = "<<_m[0][pos];
-		cout<<"_m[1]["<<pos<<"] = "<<_m[1][pos];
-		cout<<"_m[2]["<<pos<<"] = "<<_m[2][pos];
+		cout<<"_m[0]["<<pos<<"] = "<<_m[0][pos] << " ";
+		cout<<"_m[1]["<<pos<<"] = "<<_m[1][pos] << " ";
+		cout<<"_m[2]["<<pos<<"] = "<<_m[2][pos] << " ";
 		cout <<pos<<endl;
 		if(pos<3) pos++;
 		else pos = 0;
