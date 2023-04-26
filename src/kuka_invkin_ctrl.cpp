@@ -10,6 +10,7 @@
 #include <kdl/chainiksolvervel_pinv.hpp>
 #include <kdl/chainiksolverpos_nr.hpp>
 
+
 using namespace std;
 
 
@@ -63,6 +64,9 @@ class KUKA_INVKIN {
 		//that data have been received
 		bool _first_js;
 		bool _first_fk;
+
+		//trajectory
+		float _m[3][4];
 	
 
 };
@@ -94,6 +98,23 @@ KUKA_INVKIN::KUKA_INVKIN() {
 	//Set the control flags to false
 	_first_js = false;
 	_first_fk = false;
+
+	//init matrix
+	_m[0][0] = -1.0;
+	_m[1][0] = -1.0;
+	_m[2][0] = -1.0;
+
+	_m[0][1] = -1.0;
+	_m[1][1] = 1.0;
+	_m[2][1] = -1.0;
+
+	_m[0][2] = 1.0;
+	_m[1][2] = 1.0;
+	_m[2][2] = -1.0;
+
+	_m[0][3] = 1.0;
+	_m[1][3] = -1.0;
+	_m[2][3] = -1.0;
 }
 
 
@@ -173,7 +194,6 @@ void KUKA_INVKIN::goto_initial_position( float dp[7] ) {
 		}
 		r.sleep();
 	}
-
 	sleep(2);
 }
 
@@ -231,7 +251,6 @@ void KUKA_INVKIN::ctrl_loop() {
 	//Wait until the first fk has not been calculated
 	while( !_first_fk ) usleep(0.1);
 
-
 	//Control the robot towards a fixed initial position
 	float i_cmd[7];
 	i_cmd[0] = 0.0;
@@ -239,44 +258,78 @@ void KUKA_INVKIN::ctrl_loop() {
 	i_cmd[3] = -1.57;
 	i_cmd[5] = 1.57;
 	goto_initial_position( i_cmd );
+	
 
 	//F_dest is the target frame: where we want to bring the robot end effector 
 	KDL::Frame F_dest;
+	
 
 	//q_out is the variable storing the output of the Inverse kinematic
 	KDL::JntArray q_out(_k_chain.getNrOfJoints());
-
-	//Generate the goal position
-	//	Starting from the current position (_p_out) 
-	//		command the data with an offset
-	F_dest.p.data[0] = _p_out.p.x() + 0.2;
-	F_dest.p.data[1] = _p_out.p.y();
-	F_dest.p.data[2] = _p_out.p.z() - 0.1;
-
-	//The orientation set point is the same of the current one
-	for(int i=0; i<9; i++ )
-		F_dest.M.data[i] = _p_out.M.data[i];
 
 	//Lock the code to start manually the execution of the trajectory
 	cout << "Press enter to start the trajectory execution" << endl;
 	string ln;
 	getline(cin, ln);
 	
+	
+	
 	std_msgs::Float64 cmd[7];
 
-	//CartToJnt: transform the desired cartesian position into joint values
-	if( _ik_solver_pos->CartToJnt(*_q_in, F_dest, q_out) != KDL::SolverI::E_NOERROR ) 
-		cout << "failing in ik!" << endl;
+	cout << "_p_out.p.x = " << _p_out.p.x() <<endl;
+	cout << "_p_out.p.y = " << _p_out.p.y() <<endl;
+	cout << "_p_out.p.z = " << _p_out.p.z() <<endl;
 
-	//Convert KDL output values into std_msgs::Float datatype
-	for(int i=0; i<7; i++) {
-		cmd[i].data = q_out.data[i];
+	for(int i=0;i<4;i++){
+		_m[0][i] = _m[0][i]/6 + _p_out.p.x();
+		_m[1][i] = _m[1][i]/6 + _p_out.p.y();
+		_m[2][i] = _m[2][i]/6 + _p_out.p.z();
+	}/*
+	for ( int i = 0; i < 3; i++ )
+      for ( int j = 0; j < 4; j++ ) {
+      
+         cout << "_m[" << i << "][" << j << "]: ";
+         cout << _m[i][j]<< endl;
+      }*/
+
+	int pos = 0;
+
+	for(int i=0; i<=4;i++){
+		//Generate the goal position
+		//	Starting from the current position (_p_out) 
+		//		command the data with an offset
+		F_dest.p.data[0] = _m[0][pos];
+		F_dest.p.data[1] = _m[1][pos];
+		F_dest.p.data[2] = _m[2][pos];
+		cout<<"_m[0]["<<pos<<"] = "<<_m[0][pos];
+		cout<<"_m[1]["<<pos<<"] = "<<_m[1][pos];
+		cout<<"_m[2]["<<pos<<"] = "<<_m[2][pos];
+		cout <<pos<<endl;
+		if(pos<3) pos++;
+		else pos = 0;
+
+		//The orientation set point is the same of the current one
+		for(int i=0; i<9; i++ )
+			F_dest.M.data[i] = _p_out.M.data[i];
+
+
+		//CartToJnt: transform the desired cartesian position into joint values
+		if( _ik_solver_pos->CartToJnt(*_q_in, F_dest, q_out) != KDL::SolverI::E_NOERROR ) 
+			cout << "failing in ik!" << endl;
+
+		//Convert KDL output values into std_msgs::Float datatype
+		for(int i=0; i<7; i++) {
+			cmd[i].data = q_out.data[i];
+		}
+
+		//Publish all the commands in topics
+		for(int i=0; i<7; i++) {
+			_cmd_pub[i].publish (cmd[i]);
+		}
+
+		usleep(1000000);
 	}
 
-	//Publish all the commands in topics
-	for(int i=0; i<7; i++) {
-		_cmd_pub[i].publish (cmd[i]);
-	}
 }
 
 
