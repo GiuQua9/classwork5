@@ -10,6 +10,8 @@
 #include <kdl/chainiksolvervel_pinv.hpp>
 #include <kdl/chainiksolverpos_nr.hpp>
 
+#include <fstream>
+
 
 using namespace std;
 
@@ -288,7 +290,9 @@ void KUKA_INVKIN::ctrl_loop() {
 
 	int pos = 0;
 
-	for(int i=0; i<=4;i++){
+	for(int i=0; i<=5;i++){
+		ofstream myfile;
+
 		//Generate the goal position
 		//	Starting from the current position (_p_out) 
 		//		command the data with an offset
@@ -310,11 +314,19 @@ void KUKA_INVKIN::ctrl_loop() {
 		//CartToJnt: transform the desired cartesian position into joint values
 		if( _ik_solver_pos->CartToJnt(*_q_in, F_dest, q_out) != KDL::SolverI::E_NOERROR ) 
 			cout << "failing in ik!" << endl;
+		
+		myfile.open ("/home/dev/rl_ros1/src/cwork5/pos_quat.txt",ios::app);
+		myfile << "position = [ " << _p_out.p.x() <<" " << _p_out.p.y() <<" "<< _p_out.p.z() <<"] ";
+		myfile << "joint = [ ";
+		
 
 		//Convert KDL output values into std_msgs::Float datatype
 		for(int i=0; i<7; i++) {
 			cmd[i].data = q_out.data[i];
+			myfile << q_out.data[i] << " ";
 		}
+		myfile <<"] \n";
+		myfile.close();
 
 		//Publish all the commands in topics
 		for(int i=0; i<7; i++) {
